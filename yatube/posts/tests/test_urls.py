@@ -79,7 +79,6 @@ class PostURLTests(TestCase):
         redirect_names = {
             'posts:add_comment': 'posts:post_detail',
             'posts:profile_follow': 'posts:profile',
-            # 'posts:profile_unfollow': 'posts:profile',
         }
         for name, arg, _ in self.names_table:
             with self.subTest(name=name):

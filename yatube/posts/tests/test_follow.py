@@ -1,7 +1,6 @@
 from http import HTTPStatus
 
 from django.core.cache import cache
-from django.db import IntegrityError, transaction
 from django.test import Client, TestCase
 from django.urls import reverse
 
@@ -84,26 +83,28 @@ class PostFollowTests(TestCase):
         """*** FOLLOW: проверка ограничения на самоподписку."""
         Follow.objects.all().delete()
         # Подпишемся
-        try:
-            with transaction.atomic():
-                Follow.objects.create(user=self.user, author=self.user)
-        except IntegrityError:
-            pass
+        response = self.follow_client.post(
+            reverse('posts:profile_follow', args=(self.user.username,)),
+            follow=True
+        )
+        # Проверяем, сработал ли редирект
+        self.assertRedirects(
+            response, reverse('posts:profile', args=(self.user.username,)))
         # Проверяем, увеличилось ли число подписок
         self.assertEqual(Follow.objects.count(), 0)
 
     def test_second_follow(self):
         """*** FOLLOW: проверка повторной подписки."""
         Follow.objects.all().delete()
-        # Подпишемся
-        Follow.objects.create(user=self.user, author=self.author)
-        # Проверяем, увеличилось ли число подписок
-        self.assertEqual(Follow.objects.count(), 1)
-        try:
-            with transaction.atomic():
-                # Подпишемся повторно
-                Follow.objects.create(user=self.user, author=self.author)
-        except IntegrityError:
-            pass
-        # Проверяем, увеличилось ли число подписок
-        self.assertEqual(Follow.objects.count(), 1)
+        for _ in range(2):
+            # Подпишемся
+            response = self.follow_client.post(
+                reverse('posts:profile_follow', args=(self.author.username,)),
+                follow=True
+            )
+            # Проверяем, сработал ли редирект
+            self.assertRedirects(
+                response, reverse('posts:profile',
+                                  args=(self.author.username,)))
+            # Проверяем, увеличилось ли число подписок
+            self.assertEqual(Follow.objects.count(), 1)

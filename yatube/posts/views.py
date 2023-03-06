@@ -1,8 +1,6 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 
-from core.views import page_not_found
-
 from .models import Follow, Group, Post, User
 from .forms import CommentForm, PostForm
 from .utils import paginator
@@ -40,9 +38,8 @@ def profile(request, username):
 
 
 def post_detail(request, post_id):
-    # post = get_object_or_404(Post, id=post_id)
-    post = get_object_or_404(Post.objects.prefetch_related('comments__author'),
-                             id=post_id)
+    post = get_object_or_404(Post.objects.select_related(
+        'author').prefetch_related('comments__author'), id=post_id)
     form = CommentForm()
     context = {
         'post': post,
@@ -114,9 +111,6 @@ def profile_follow(request, username):
 @login_required
 def profile_unfollow(request, username):
     # Дизлайк, отписка
-    follow = get_object_or_404(Follow, user=request.user,
-                               author__username=username)
-    if request.user == follow.author:
-        return page_not_found(request, None)
-    follow.delete()
+    get_object_or_404(Follow, user=request.user,
+                      author__username=username).delete()
     return redirect('posts:profile', username)

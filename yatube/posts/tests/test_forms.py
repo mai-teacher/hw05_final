@@ -166,15 +166,12 @@ class PostFormsTests(TestCase):
         context = Comment.objects.first()
         self.assertEqual(context.text, form_data['text'])
         self.assertEqual(context.author, self.user)
-        # Проверяем, изменилось ли id поста
-        self.assertEqual(post.id, self.post.id)
-        # Проверяем, изменился ли author поста
-        self.assertEqual(post.author, self.post.author)
-        # Проверяем изменение текста поста
-        self.assertEqual(post.text, self.post.text)
+        # Проверяем изменение поста
+        self.assertEqual(post, self.post)
 
     def test_anonym_add_comments(self):
         """*** FORMS: проверка добавления комментария анонимом."""
+        Comment.objects.all().delete()
         post = Post.objects.first()
         form_data = {
             'text': 'Добавление нового комментария',
@@ -186,6 +183,10 @@ class PostFormsTests(TestCase):
             data=form_data,
             follow=True
         )
+        # Проверяем, увеличилось ли число комментарий
+        self.assertEqual(Comment.objects.count(), 0)
         # Проверяем, сработал ли редирект на login
         login = reverse('login')
         self.assertRedirects(response, f'{login}?next={reverse_name_add}')
+        # Проверяем, увеличилось ли число комментарий
+        self.assertEqual(Comment.objects.count(), 0)

@@ -1,7 +1,7 @@
 from http import HTTPStatus
 
 from django.core.cache import cache
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.test import Client, TestCase
 from django.urls import reverse
 
@@ -82,8 +82,15 @@ class PostFollowTests(TestCase):
 
     def test_self_follow(self):
         """*** FOLLOW: проверка ограничения на самоподписку."""
-        with self.assertRaisesMessage(IntegrityError, 'prevent_self_follow'):
-            Follow.objects.create(user=self.user, author=self.user)
+        Follow.objects.all().delete()
+        # Подпишемся
+        try:
+            with transaction.atomic():
+                Follow.objects.create(user=self.user, author=self.user)
+        except IntegrityError:
+            pass
+        # Проверяем, увеличилось ли число подписок
+        self.assertEqual(Follow.objects.count(), 0)
 
     def test_second_follow(self):
         """*** FOLLOW: проверка повторной подписки."""
@@ -92,6 +99,11 @@ class PostFollowTests(TestCase):
         Follow.objects.create(user=self.user, author=self.author)
         # Проверяем, увеличилось ли число подписок
         self.assertEqual(Follow.objects.count(), 1)
-        # Подпишемся повторно
-        with self.assertRaisesMessage(IntegrityError, 'UNIQUE'):
-            Follow.objects.create(author=self.author, user=self.user)
+        try:
+            with transaction.atomic():
+                # Подпишемся повторно
+                Follow.objects.create(user=self.user, author=self.author)
+        except IntegrityError:
+            pass
+        # Проверяем, увеличилось ли число подписок
+        self.assertEqual(Follow.objects.count(), 1)

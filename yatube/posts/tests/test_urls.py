@@ -79,12 +79,15 @@ class PostURLTests(TestCase):
         redirect_names = {
             'posts:add_comment': 'posts:post_detail',
             'posts:profile_follow': 'posts:profile',
-            'posts:profile_unfollow': 'posts:profile',
+            # 'posts:profile_unfollow': 'posts:profile',
         }
         for name, arg, _ in self.names_table:
             with self.subTest(name=name):
                 response = self.authorized_client.get(reverse(name, args=arg))
-                if name in redirect_names.keys():
+                if name == 'posts:profile_unfollow':
+                    self.assertEqual(response.status_code,
+                                     HTTPStatus.NOT_FOUND)
+                elif name in redirect_names.keys():
                     self.assertRedirects(
                         response,
                         reverse(redirect_names.get(name), args=arg))

@@ -1,13 +1,13 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.cache import cache_page
+
+from core.views import page_not_found
 
 from .models import Follow, Group, Post, User
 from .forms import CommentForm, PostForm
 from .utils import paginator
 
 
-@cache_page(20, key_prefix='index_page')
 def index(request):
     posts = Post.objects.select_related('group', 'author').all()
     page_obj = paginator(request, posts)
@@ -29,10 +29,8 @@ def profile(request, username):
     author = get_object_or_404(User, username=username)
     posts = author.posts.select_related('group').all()
     page_obj = paginator(request, posts)
-    following = False
-    if request.user.is_authenticated:
-        following = Follow.objects.filter(user=request.user,
-                                          author=author).exists()
+    following = (request.user.is_authenticated and request.user != author
+                 and author.following.filter(user=request.user).exists())
     context = {
         'author': author,
         'page_obj': page_obj,
@@ -42,13 +40,14 @@ def profile(request, username):
 
 
 def post_detail(request, post_id):
-    post = get_object_or_404(Post, id=post_id)
-    comments = post.comments.all()
+    # post = get_object_or_404(Post, id=post_id)
+    post = get_object_or_404(Post.objects.prefetch_related('comments__author'),
+                             id=post_id)
     form = CommentForm()
     context = {
         'post': post,
         'form': form,
-        'comments': comments,
+        'comments': post.comments.all(),
     }
     return render(request, 'posts/post_detail.html', context)
 
@@ -97,7 +96,8 @@ def add_comment(request, post_id):
 
 @login_required
 def follow_index(request):
-    posts = Post.objects.filter(author__following__user=request.user)
+    posts = Post.objects.filter(
+        author__following__user=request.user).select_related('group', 'author')
     page_obj = paginator(request, posts)
     return render(request, 'posts/follow.html', {'page_obj': page_obj})
 
@@ -105,17 +105,18 @@ def follow_index(request):
 @login_required
 def profile_follow(request, username):
     # Подписаться на автора username
-    user = get_object_or_404(User, username=request.user)
     author = get_object_or_404(User, username=username)
-    if user != author:
-        Follow.objects.get_or_create(user=user, author=author)
+    if request.user != author:
+        Follow.objects.get_or_create(user=request.user, author=author)
     return redirect('posts:profile', username)
 
 
 @login_required
 def profile_unfollow(request, username):
     # Дизлайк, отписка
-    user = get_object_or_404(User, username=request.user)
-    author = get_object_or_404(User, username=username)
-    Follow.objects.filter(user=user, author=author).delete()
+    follow = get_object_or_404(Follow, user=request.user,
+                               author__username=username)
+    if request.user == follow.author:
+        return page_not_found(request, None)
+    follow.delete()
     return redirect('posts:profile', username)

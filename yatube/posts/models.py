@@ -94,6 +94,9 @@ class Comment(models.Model):
         verbose_name = 'Комментарий'
         verbose_name_plural = 'Комментарии'
 
+    def __str__(self) -> str:
+        return self.text[:settings.POST_FIRST_CHARS]
+
 
 class Follow(models.Model):
     user = models.ForeignKey(
@@ -115,4 +118,9 @@ class Follow(models.Model):
         constraints = [
             models.UniqueConstraint(fields=['author', 'user'],
                                     name='unique_follow'),
+            models.CheckConstraint(name='prevent_self_follow',
+                                   check=~models.Q(user=models.F('author')))
         ]
+
+    def __str__(self) -> str:
+        return f'{self.user.username} -> {self.author.username}'

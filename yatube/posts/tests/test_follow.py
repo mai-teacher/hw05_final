@@ -1,6 +1,7 @@
 from http import HTTPStatus
 
 from django.core.cache import cache
+from django.db import IntegrityError
 from django.test import Client, TestCase
 from django.urls import reverse
 
@@ -20,8 +21,8 @@ class PostFollowTests(TestCase):
         cls.follow_client.force_login(cls.user)
         cache.clear()
 
-    def test_view_follow_unfollow(self):
-        """*** FOLLOW: проверка создания/удаления подписки."""
+    def test_follow(self):
+        """*** FOLLOW: проверка создания подписки."""
         Follow.objects.all().delete()
         follow_num = Follow.objects.count()
         # Подпишемся
@@ -38,6 +39,14 @@ class PostFollowTests(TestCase):
         self.assertEqual(follow.user, self.user)
         self.assertEqual(follow.author, self.author)
 
+    def test_unfollow(self):
+        """*** FOLLOW: проверка удаления подписки."""
+        Follow.objects.all().delete()
+        # Подпишемся
+        Follow.objects.create(user=self.user, author=self.author)
+        # Проверяем, увеличилось ли число подписок
+        self.assertEqual(Follow.objects.count(), 1)
+
         # Отпишемся
         response = self.follow_client.post(
             reverse('posts:profile_unfollow', args=(self.author.username,)),
@@ -49,7 +58,7 @@ class PostFollowTests(TestCase):
         # Проверяем, увеличилось ли число подписок
         self.assertEqual(Follow.objects.count(), 0)
 
-    def test_view_follow_index(self):
+    def test_follow_index(self):
         """*** FOLLOW: проверка появления подписки в ленте."""
         Follow.objects.all().delete()
         Post.objects.all().delete()
@@ -70,3 +79,19 @@ class PostFollowTests(TestCase):
             reverse('posts:follow_index'))
         self.assertEqual(response.status_code, HTTPStatus.OK)
         self.assertEqual(len(response.context['page_obj']), 1)
+
+    def test_self_follow(self):
+        """*** FOLLOW: проверка ограничения на самоподписку."""
+        with self.assertRaisesMessage(IntegrityError, 'prevent_self_follow'):
+            Follow.objects.create(user=self.user, author=self.user)
+
+    def test_second_follow(self):
+        """*** FOLLOW: проверка повторной подписки."""
+        Follow.objects.all().delete()
+        # Подпишемся
+        Follow.objects.create(user=self.user, author=self.author)
+        # Проверяем, увеличилось ли число подписок
+        self.assertEqual(Follow.objects.count(), 1)
+        # Подпишемся повторно
+        with self.assertRaisesMessage(IntegrityError, 'UNIQUE'):
+            Follow.objects.create(author=self.author, user=self.user)

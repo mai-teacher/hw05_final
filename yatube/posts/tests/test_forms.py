@@ -163,6 +163,29 @@ class PostFormsTests(TestCase):
             response, reverse('posts:post_detail', args=(self.post.id,)))
         # Проверяем, увеличилось ли число комментарий
         self.assertEqual(Comment.objects.count(), 1)
-        context = response.context['comments'][0]
+        context = Comment.objects.first()
         self.assertEqual(context.text, form_data['text'])
         self.assertEqual(context.author, self.user)
+        # Проверяем, изменилось ли id поста
+        self.assertEqual(post.id, self.post.id)
+        # Проверяем, изменился ли author поста
+        self.assertEqual(post.author, self.post.author)
+        # Проверяем изменение текста поста
+        self.assertEqual(post.text, self.post.text)
+
+    def test_anonym_add_comments(self):
+        """*** FORMS: проверка добавления комментария анонимом."""
+        post = Post.objects.first()
+        form_data = {
+            'text': 'Добавление нового комментария',
+        }
+        # Отправляем POST-запрос
+        reverse_name_add = reverse('posts:add_comment', args=(post.id,))
+        response = self.client.post(
+            reverse_name_add,
+            data=form_data,
+            follow=True
+        )
+        # Проверяем, сработал ли редирект на login
+        login = reverse('login')
+        self.assertRedirects(response, f'{login}?next={reverse_name_add}')

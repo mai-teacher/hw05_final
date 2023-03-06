@@ -3,8 +3,8 @@
 {% block title %}Последние обновления на сайте{% endblock title %}
 {% block content %}
     <h1>Последние обновления на сайте</h1>
-      {% include 'posts/includes/switcher.html' %}
-      {% cache 20 index_page %}
+      {% include 'posts/includes/switcher.html' with index=True %}
+      {% cache 20 sidebar index page_obj.number %}
         {% for post in page_obj %}
           {% include 'posts/includes/post.html' %}
           {% if not forloop.last %}<hr>{% endif %}

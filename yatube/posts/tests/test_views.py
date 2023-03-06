@@ -5,7 +5,7 @@ from django.urls import reverse
 from django import forms
 
 from posts.forms import PostForm
-from posts.models import Group, Post, User
+from posts.models import Follow, Group, Post, User
 
 TEST_POSTS_NUM = 13
 
@@ -82,7 +82,8 @@ class PostPagesTests(TestCase):
         )
         form_fields = (
             ('text', forms.fields.CharField),
-            ('group', forms.fields.ChoiceField)
+            ('group', forms.fields.ChoiceField),
+            ('image', forms.fields.ImageField)
         )
 
         for addr_name, addr_arg in address:
@@ -99,10 +100,12 @@ class PostPagesTests(TestCase):
 
     def test_view_paginator(self):
         """*** VIEWS: проверка паджинаторов."""
+        user2: User = User.objects.create_user(username='author2')
         address = (
             ('posts:index', None),
             ('posts:group_list', (self.group.slug,)),
-            ('posts:profile', (self.user.username,)),
+            ('posts:profile', (user2.username,)),
+            ('posts:follow_index', None),
         )
         pages = (
             ('?page=1', settings.POSTS_NUM),
@@ -114,18 +117,22 @@ class PostPagesTests(TestCase):
         post_list = [
             Post(
                 text='Тестовый текст поста',
-                author=self.user,
+                author=user2,
                 group=self.group
             )
             for _ in range(TEST_POSTS_NUM)
         ]
         Post.objects.bulk_create(post_list)
 
+        # Подпишемся
+        Follow.objects.all().delete()
+        Follow.objects.create(user=self.user, author=user2)
+
         for addr_name, addr_arg in address:
             with self.subTest(addr_name=addr_name):
                 for page_n, num in pages:
                     with self.subTest(page_n=page_n):
-                        response = self.client.get(
+                        response = self.authorized_client.get(
                             reverse(addr_name, args=addr_arg)
                             + page_n)
                         self.assertEqual(len(response.context['page_obj']),
